@@ -1,5 +1,6 @@
 ﻿#include "Core/Window.h"
 #include "Core/Logger.h"
+#include "Input/InputManager.h"
 #include <windows.h>
 #include <GL/gl.h>
 #include <vector>
@@ -23,17 +24,17 @@ namespace Nexus
     {
         // Remove common prefixes and clean up the name
         std::string cleaned = deviceString;
-
+        
         // Remove manufacturer prefixes
         size_t pos = cleaned.find("Intel(R) ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 9);
-
+        
         pos = cleaned.find("NVIDIA ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 7);
-
+        
         pos = cleaned.find("AMD ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 4);
-
+        
         return cleaned;
     }
 
@@ -41,20 +42,20 @@ namespace Nexus
     void DetectAllGraphicsAdapters()
     {
         NEXUS_CORE_INFO("=== System Graphics Hardware ===");
-
+        
         DISPLAY_DEVICEA displayDevice;
         displayDevice.cb = sizeof(displayDevice);
-
+        
         std::vector<std::string> activeGPUs;
         std::vector<std::string> inactiveGPUs;
-
+        
         for (DWORD deviceIndex = 0; ; deviceIndex++)
         {
             if (!EnumDisplayDevicesA(NULL, deviceIndex, &displayDevice, 0))
                 break;
-
+                
             std::string gpuName = ExtractGPUName(std::string(displayDevice.DeviceString));
-
+            
             if (displayDevice.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)
             {
                 if (displayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
@@ -84,14 +85,14 @@ namespace Nexus
                 }
             }
         }
-
+        
         // Display results with simple ASCII
         NEXUS_CORE_INFO("Active Graphics:");
         for (const auto& gpu : activeGPUs)
         {
             NEXUS_CORE_INFO("  [ACTIVE] " + gpu);
         }
-
+        
         if (!inactiveGPUs.empty())
         {
             NEXUS_CORE_INFO("Available Graphics:");
@@ -100,7 +101,7 @@ namespace Nexus
                 NEXUS_CORE_INFO("  [AVAIL]  " + gpu);
             }
         }
-
+        
         NEXUS_CORE_INFO("Total GPUs Found: " + std::to_string(activeGPUs.size() + inactiveGPUs.size()));
     }
 
@@ -148,9 +149,9 @@ namespace Nexus
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        m_Window = glfwCreateWindow((int)props.Width, (int)props.Height,
-            m_Data.Title.c_str(), nullptr, nullptr);
-
+        m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, 
+                                   m_Data.Title.c_str(), nullptr, nullptr);
+        
         if (!m_Window)
         {
             NEXUS_CORE_ERROR("Failed to create GLFW window!");
@@ -159,15 +160,34 @@ namespace Nexus
 
         glfwMakeContextCurrent(m_Window);
 
+        // Setup input callbacks
+        glfwSetWindowUserPointer(m_Window, this);
+        glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+        {
+            InputManager::KeyCallback(window, key, scancode, action, mods);
+        });
+        glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
+        {
+            InputManager::MouseButtonCallback(window, button, action, mods);
+        });
+        glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xpos, double ypos)
+        {
+            InputManager::MousePositionCallback(window, xpos, ypos);
+        });
+        glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xoffset, double yoffset)
+        {
+            InputManager::MouseScrollCallback(window, xoffset, yoffset);
+        });
+
         // Clean OpenGL info
         NEXUS_CORE_INFO("=== Active OpenGL Context ===");
         std::string vendor = (char*)glGetString(GL_VENDOR);
         std::string renderer = (char*)glGetString(GL_RENDERER);
         std::string version = (char*)glGetString(GL_VERSION);
-
+        
         NEXUS_CORE_INFO("Currently Using: " + ExtractGPUName(renderer));
         NEXUS_CORE_INFO("OpenGL Version: " + version);
-
+        
         const char* glslVersion = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
         if (glslVersion)
         {
@@ -191,6 +211,7 @@ namespace Nexus
 
         glfwSwapInterval(1);
         NEXUS_CORE_INFO("Window Resolution: " + std::to_string(props.Width) + "x" + std::to_string(props.Height) + " @ 60Hz V-Sync");
+        NEXUS_CORE_INFO("Input callbacks registered successfully");
 
         return true;
     }
@@ -207,6 +228,7 @@ namespace Nexus
     void Window::Update()
     {
         glfwPollEvents();
+        InputManager::Update();  // Update input state each frame
     }
 
     void Window::SwapBuffers()

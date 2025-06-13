@@ -1,5 +1,5 @@
 -- NexusEngine Root Build Configuration
--- Session 002 - Added GLFW, GLM, and GLAD support
+-- Session 003 - Added Math and Input modules
 
 workspace "NexusEngine"
     architecture "x64"
@@ -23,7 +23,6 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 IncludeDir = {}
 IncludeDir["GLFW"] = "ThirdParty/GLFW/include"
 IncludeDir["GLM"] = "ThirdParty/GLM"
-IncludeDir["GLAD"] = "ThirdParty/GLAD/Include"
 
 -- Build GLFW as a static library
 project "GLFW"
@@ -70,11 +69,12 @@ project "GLFW"
             "_CRT_SECURE_NO_WARNINGS"
         }
 
--- Build GLAD as a static library
-project "GLAD"
-    location "ThirdParty/GLAD"
+-- Math Library
+project "Math"
+    location "Engine/Math"
     kind "StaticLib"
     language "C++"
+    cppdialect "C++20"
     staticruntime "off"
 
     targetdir ("bin/" .. outputdir .. "/%{prj.name}")
@@ -82,8 +82,8 @@ project "GLAD"
 
     files
     {
-        "%{prj.location}/Include/glad.h",
-        "%{prj.location}/Source/glad.cpp"
+        "%{prj.location}/Include/**.h",
+        "%{prj.location}/Source/**.cpp"
     }
 
     includedirs
@@ -93,6 +93,57 @@ project "GLAD"
 
     filter "system:windows"
         systemversion "latest"
+        defines "NEXUS_PLATFORM_WINDOWS"
+
+    filter "configurations:Debug"
+        defines "NEXUS_DEBUG"
+        symbols "on"
+
+    filter "configurations:Release"
+        defines "NEXUS_RELEASE"
+        optimize "on"
+
+-- Input System
+project "Input"
+    location "Engine/Input"
+    kind "StaticLib"
+    language "C++"
+    cppdialect "C++20"
+    staticruntime "off"
+
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{prj.location}/Include/**.h",
+        "%{prj.location}/Source/**.cpp"
+    }
+
+    includedirs
+    {
+        "%{prj.location}/Include",
+        "Engine/Math/Include",
+        "Engine/Core/Include",
+        "%{IncludeDir.GLFW}"
+    }
+
+    links
+    {
+        "Math"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+        defines "NEXUS_PLATFORM_WINDOWS"
+
+    filter "configurations:Debug"
+        defines "NEXUS_DEBUG"
+        symbols "on"
+
+    filter "configurations:Release"
+        defines "NEXUS_RELEASE"
+        optimize "on"
 
 -- Engine Core
 project "Core"
@@ -120,15 +171,17 @@ project "Core"
     includedirs
     {
         "%{prj.location}/Include",
+        "Engine/Math/Include",
+        "Engine/Input/Include",
         "%{IncludeDir.GLFW}",
-        "%{IncludeDir.GLM}",
-        "%{IncludeDir.GLAD}"
+        "%{IncludeDir.GLM}"
     }
 
     links
     {
+        "Math",
+        "Input",
         "GLFW",
-        "GLAD",
         "opengl32.lib"
     }
 
@@ -165,14 +218,17 @@ project "Runtime"
     {
         "%{prj.location}/Include",
         "Engine/Core/Include",
+        "Engine/Math/Include",
+        "Engine/Input/Include",
         "%{IncludeDir.GLFW}",
-        "%{IncludeDir.GLM}",
-        "%{IncludeDir.GLAD}"
+        "%{IncludeDir.GLM}"
     }
 
     links
     {
-        "Core"
+        "Core",
+        "Math",
+        "Input"
     }
 
     filter "system:windows"
