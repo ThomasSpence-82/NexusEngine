@@ -1,0 +1,8 @@
+# Build outputs
+bin/
+bin-int/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
