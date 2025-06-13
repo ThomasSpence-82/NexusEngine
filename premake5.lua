@@ -1,5 +1,5 @@
 -- NexusEngine Root Build Configuration
--- Session 003 - Added Math and Input modules
+-- Session 003 - Added Math, Input, and Renderer modules
 
 workspace "NexusEngine"
     architecture "x64"
@@ -145,6 +145,50 @@ project "Input"
         defines "NEXUS_RELEASE"
         optimize "on"
 
+-- Renderer System
+project "Renderer"
+    location "Engine/Renderer"
+    kind "StaticLib"
+    language "C++"
+    cppdialect "C++20"
+    staticruntime "off"
+
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{prj.location}/Include/**.h",
+        "%{prj.location}/Source/**.cpp"
+    }
+
+    includedirs
+    {
+        "%{prj.location}/Include",
+        "Engine/Math/Include",
+        "Engine/Core/Include",
+        "%{IncludeDir.GLFW}",
+        "%{IncludeDir.GLM}"
+    }
+
+    links
+    {
+        "Math",
+        "opengl32.lib"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+        defines "NEXUS_PLATFORM_WINDOWS"
+
+    filter "configurations:Debug"
+        defines "NEXUS_DEBUG"
+        symbols "on"
+
+    filter "configurations:Release"
+        defines "NEXUS_RELEASE"
+        optimize "on"
+
 -- Engine Core
 project "Core"
     location "Engine/Core"
@@ -173,6 +217,7 @@ project "Core"
         "%{prj.location}/Include",
         "Engine/Math/Include",
         "Engine/Input/Include",
+        "Engine/Renderer/Include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLM}"
     }
@@ -181,6 +226,7 @@ project "Core"
     {
         "Math",
         "Input",
+        "Renderer",
         "GLFW",
         "opengl32.lib"
     }
@@ -220,6 +266,7 @@ project "Runtime"
         "Engine/Core/Include",
         "Engine/Math/Include",
         "Engine/Input/Include",
+        "Engine/Renderer/Include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLM}"
     }
@@ -228,7 +275,8 @@ project "Runtime"
     {
         "Core",
         "Math",
-        "Input"
+        "Input",
+        "Renderer"
     }
 
     filter "system:windows"
