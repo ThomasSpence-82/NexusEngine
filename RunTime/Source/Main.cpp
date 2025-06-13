@@ -2,23 +2,31 @@
 #include "Core/Window.h"
 #include "Input/InputManager.h"
 #include "Renderer/Shader.h"
+#include "Renderer/Texture.h"
+#include "Renderer/Camera.h"
 #include "Math/Vector3.h"
+#include "Math/Matrix4.h"
 #include <windows.h>
 #include <GL/gl.h>
 
-// Simple vertex and fragment shaders for our triangle
+// 3D vertex and fragment shaders with MVP matrices and textures
 const std::string vertexShaderSource = R"(
 #version 330 core
 
 layout(location = 0) in vec3 a_Position;
 layout(location = 1) in vec3 a_Color;
+layout(location = 2) in vec2 a_TexCoord;
+
+uniform mat4 u_MVP;
 
 out vec3 v_Color;
+out vec2 v_TexCoord;
 
 void main()
 {
     v_Color = a_Color;
-    gl_Position = vec4(a_Position, 1.0);
+    v_TexCoord = a_TexCoord;
+    gl_Position = u_MVP * vec4(a_Position, 1.0);
 }
 )";
 
@@ -26,11 +34,16 @@ const std::string fragmentShaderSource = R"(
 #version 330 core
 
 in vec3 v_Color;
+in vec2 v_TexCoord;
+
+uniform sampler2D u_Texture;
+
 out vec4 FragColor;
 
 void main()
 {
-    FragColor = vec4(v_Color, 1.0);
+    vec4 texColor = texture(u_Texture, v_TexCoord);
+    FragColor = texColor * vec4(v_Color, 1.0);
 }
 )";
 
@@ -44,7 +57,7 @@ int main()
     Nexus::InputManager::Initialize();
 
     // Create window
-    auto window = Nexus::Window::Create(Nexus::WindowProps("NexusEngine - THE LEGENDARY TRIANGLE!", 1280, 720));
+    auto window = Nexus::Window::Create(Nexus::WindowProps("NexusEngine - 3D TEXTURED CUBE!", 1280, 720));
 
     if (!window)
     {
@@ -52,11 +65,13 @@ int main()
         return -1;
     }
 
-    NEXUS_INFO("=== TRIANGLE RENDERING TEST ===");
-    NEXUS_INFO("Preparing to render the legendary triangle!");
+    NEXUS_INFO("=== 3D TEXTURED CUBE RENDERING ===");
+    NEXUS_INFO("WASD - Move camera, Arrow Keys - Look around, ESC - Exit");
 
-    // Create our first shader
-    auto shader = Nexus::Shader::Create("TriangleShader", vertexShaderSource, fragmentShaderSource);
+    // Create shader and texture
+    auto shader = Nexus::Shader::Create("CubeShader", vertexShaderSource, fragmentShaderSource);
+    auto texture = Nexus::Texture::Create("checkerboard"); // We'll generate a procedural texture
+    auto camera = new Nexus::Camera(45.0f, 1280.0f / 720.0f, 0.1f, 100.0f);
 
     if (!shader)
     {
@@ -64,17 +79,38 @@ int main()
         return -1;
     }
 
-    NEXUS_INFO("Shader created successfully! Ready to render triangle!");
-
-    // Triangle vertex data (position + color)
+    // Cube vertex data: position (3) + color (3) + texture coords (2) = 8 floats per vertex
     float vertices[] = {
-        // Position        // Color
-        -0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // Bottom left - Red
-         0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // Bottom right - Green  
-         0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // Top center - Blue
+        // Front face
+        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f, // Bottom-left
+         0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f, // Bottom-right
+         0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f, // Top-right
+        -0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,  0.0f, 1.0f, // Top-left
+
+        // Back face  
+        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,  1.0f, 0.0f, // Bottom-left
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 1.0f,  0.0f, 0.0f, // Bottom-right
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 1.0f,  0.0f, 1.0f, // Top-right
+        -0.5f,  0.5f, -0.5f,  0.5f, 0.5f, 0.5f,  1.0f, 1.0f, // Top-left
     };
 
-    // Load OpenGL buffer functions (except glDrawArrays which is core OpenGL 1.1)
+    // Cube indices (2 triangles per face, 6 faces = 12 triangles = 36 indices)
+    unsigned int indices[] = {
+        // Front face
+        0, 1, 2, 2, 3, 0,
+        // Back face
+        4, 5, 6, 6, 7, 4,
+        // Left face
+        7, 3, 0, 0, 4, 7,
+        // Right face
+        1, 5, 6, 6, 2, 1,
+        // Top face
+        3, 2, 6, 6, 7, 3,
+        // Bottom face
+        0, 1, 5, 5, 4, 0
+    };
+
+    // Load OpenGL functions (except glDrawElements which is core OpenGL 1.1)
     typedef void (APIENTRY* PFNGLGENVERTEXARRAYSPROC)(int n, unsigned int* arrays);
     typedef void (APIENTRY* PFNGLBINDVERTEXARRAYPROC)(unsigned int array);
     typedef void (APIENTRY* PFNGLGENBUFFERSPROC)(int n, unsigned int* buffers);
@@ -91,81 +127,120 @@ int main()
     auto glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glEnableVertexAttribArray");
     auto glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)wglGetProcAddress("glVertexAttribPointer");
 
-    // Check if functions loaded successfully (glDrawArrays is core OpenGL 1.1, always available)
+    // Check if functions loaded successfully
     if (!glGenVertexArrays || !glBindVertexArray || !glGenBuffers || !glBindBuffer ||
         !glBufferData || !glEnableVertexAttribArray || !glVertexAttribPointer)
     {
         NEXUS_CORE_ERROR("Failed to load OpenGL buffer functions!");
-        NEXUS_CORE_ERROR("glGenVertexArrays: " + std::string(glGenVertexArrays ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glBindVertexArray: " + std::string(glBindVertexArray ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glGenBuffers: " + std::string(glGenBuffers ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glBindBuffer: " + std::string(glBindBuffer ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glBufferData: " + std::string(glBufferData ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glEnableVertexAttribArray: " + std::string(glEnableVertexAttribArray ? "OK" : "FAILED"));
-        NEXUS_CORE_ERROR("glVertexAttribPointer: " + std::string(glVertexAttribPointer ? "OK" : "FAILED"));
         return -1;
     }
 
     NEXUS_INFO("OpenGL buffer functions loaded successfully!");
-    NEXUS_INFO("Using core OpenGL glDrawArrays function");
+    NEXUS_INFO("Using core OpenGL glDrawElements function");
 
-    // Generate OpenGL buffers
-    unsigned int VAO, VBO;
-
-    // Create VAO and VBO
+    // Create VAO, VBO, and EBO
+    unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-
-    NEXUS_INFO("VAO and VBO created: VAO=" + std::to_string(VAO) + " VBO=" + std::to_string(VBO));
+    glGenBuffers(1, &EBO);
 
     glBindVertexArray(VAO);
+
+    // Upload vertex data
     glBindBuffer(0x8892, VBO); // GL_ARRAY_BUFFER
     glBufferData(0x8892, sizeof(vertices), vertices, 0x88E4); // GL_STATIC_DRAW
 
+    // Upload index data
+    glBindBuffer(0x8893, EBO); // GL_ELEMENT_ARRAY_BUFFER
+    glBufferData(0x8893, sizeof(indices), indices, 0x88E4); // GL_STATIC_DRAW
+
     // Position attribute (location 0)
-    glVertexAttribPointer(0, 3, 0x1406, 0, 6 * sizeof(float), (void*)0); // GL_FLOAT
+    glVertexAttribPointer(0, 3, 0x1406, 0, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Color attribute (location 1)  
-    glVertexAttribPointer(1, 3, 0x1406, 0, 6 * sizeof(float), (void*)(3 * sizeof(float))); // GL_FLOAT
+    // Color attribute (location 1)
+    glVertexAttribPointer(1, 3, 0x1406, 0, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    NEXUS_INFO("Triangle vertex data setup complete!");
-    NEXUS_INFO("Press ESC to exit - Starting render loop...");
+    // Texture coordinate attribute (location 2)
+    glVertexAttribPointer(2, 2, 0x1406, 0, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    NEXUS_INFO("3D Cube data created! Camera controls ready!");
+
+    // Enable depth testing
+    glEnable(0x0B71); // GL_DEPTH_TEST
+
+    float cubeRotation = 0.0f;
 
     // Main loop
     while (!window->ShouldClose())
     {
-        // Update input first
         window->Update();
 
-        // Close with ESC
+        // Camera controls
+        const float moveSpeed = 2.0f * (1.0f / 60.0f); // Assume 60 FPS for now
+        const float rotateSpeed = 1.0f * (1.0f / 60.0f);
+
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::W))
+            camera->MoveForward(moveSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::S))
+            camera->MoveForward(-moveSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::A))
+            camera->MoveRight(-moveSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::D))
+            camera->MoveRight(moveSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Q))
+            camera->MoveUp(moveSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::E))
+            camera->MoveUp(-moveSpeed);
+
+        // Mouse look (basic version)
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Left))
+            camera->RotateYaw(-rotateSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Right))
+            camera->RotateYaw(rotateSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Up))
+            camera->RotatePitch(rotateSpeed);
+        if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Down))
+            camera->RotatePitch(-rotateSpeed);
+
+        // Exit
         if (Nexus::InputManager::IsKeyPressed(Nexus::KeyCode::Escape))
-        {
-            NEXUS_INFO("ESC pressed - closing application!");
             break;
-        }
 
-        // Clear screen to dark background
-        glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Clear screen
+        glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
+        glClear(0x00004100); // GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT
 
-        // Bind our shader and render THE TRIANGLE!
+        // Rotate cube
+        cubeRotation += 0.5f * (1.0f / 60.0f);
+
+        // Create model matrix (rotation)
+        Nexus::Matrix4 model = Nexus::Matrix4::RotateY(cubeRotation) * Nexus::Matrix4::RotateX(cubeRotation * 0.5f);
+
+        // Create MVP matrix
+        Nexus::Matrix4 mvp = camera->GetViewProjectionMatrix() * model;
+
+        // Render cube
         shader->Bind();
-        glBindVertexArray(VAO);
-        ::glDrawArrays(0x0004, 0, 3); // Use core OpenGL function - GL_TRIANGLES
-        shader->Unbind();
+        shader->SetMatrix4("u_MVP", mvp);
+        shader->SetInt("u_Texture", 0);
 
-        // Swap buffers
+        texture->Bind(0);
+        glBindVertexArray(VAO);
+        ::glDrawElements(0x0004, 36, 0x1405, nullptr); // Use core OpenGL function - GL_TRIANGLES, GL_UNSIGNED_INT
+
         window->SwapBuffers();
     }
 
     // Cleanup
+    delete camera;
+    delete texture;
     delete shader;
     Nexus::InputManager::Shutdown();
     delete window;
-    NEXUS_CORE_INFO("Triangle test completed!");
-    NEXUS_CORE_INFO("NexusEngine shutting down.");
+    NEXUS_CORE_INFO("3D Cube demo completed!");
 
     return 0;
 }
