@@ -4,6 +4,7 @@
 #include "Renderer/Shader.h"
 #include "Renderer/Texture.h"
 #include "Renderer/Camera.h"
+#include "Renderer/Gizmo.h"
 #include "Math/Vector3.h"
 #include "Math/Matrix4.h"
 #include <windows.h>
@@ -57,7 +58,7 @@ int main()
     Nexus::InputManager::Initialize();
 
     // Create window
-    auto window = Nexus::Window::Create(Nexus::WindowProps("NexusEngine - 3D TEXTURED CUBE!", 1280, 720));
+    auto window = Nexus::Window::Create(Nexus::WindowProps("NexusEngine - 3D CUBE WITH SCREEN-SPACE GIZMO!", 1280, 720));
 
     if (!window)
     {
@@ -65,19 +66,30 @@ int main()
         return -1;
     }
 
-    NEXUS_INFO("=== 3D TEXTURED CUBE RENDERING ===");
-    NEXUS_INFO("WASD - Move camera, Arrow Keys - Look around, ESC - Exit");
+    NEXUS_INFO("=== 3D CUBE WITH PROFESSIONAL GIZMO ===");
+    NEXUS_INFO("WASD/QE - Move camera, Arrow Keys - Look around, ESC - Exit");
+    NEXUS_INFO("G - Toggle Gizmo | SPACE - Toggle Screen/World space");
 
-    // Create shader and texture
+    // Create shader, texture, camera, and gizmo
     auto shader = Nexus::Shader::Create("CubeShader", vertexShaderSource, fragmentShaderSource);
-    auto texture = Nexus::Texture::Create("checkerboard"); // We'll generate a procedural texture
+    auto texture = Nexus::Texture::Create("checkerboard");
     auto camera = new Nexus::Camera(45.0f, 1280.0f / 720.0f, 0.1f, 100.0f);
+    auto gizmo = Nexus::Gizmo::Create();
 
     if (!shader)
     {
         NEXUS_CORE_ERROR("Failed to create shader!");
         return -1;
     }
+
+    if (!gizmo)
+    {
+        NEXUS_CORE_ERROR("Failed to create gizmo!");
+        return -1;
+    }
+
+    // Position camera to see the cube clearly
+    camera->SetPosition(Nexus::Vector3(5.0f, 3.0f, -1.0f));
 
     // Cube vertex data: position (3) + color (3) + texture coords (2) = 8 floats per vertex
     float vertices[] = {
@@ -110,7 +122,7 @@ int main()
         0, 1, 5, 5, 4, 0
     };
 
-    // Load OpenGL functions (except glDrawElements which is core OpenGL 1.1)
+    // Load OpenGL functions (using your original working pattern)
     typedef void (APIENTRY* PFNGLGENVERTEXARRAYSPROC)(int n, unsigned int* arrays);
     typedef void (APIENTRY* PFNGLBINDVERTEXARRAYPROC)(unsigned int array);
     typedef void (APIENTRY* PFNGLGENBUFFERSPROC)(int n, unsigned int* buffers);
@@ -135,8 +147,7 @@ int main()
         return -1;
     }
 
-    NEXUS_INFO("OpenGL buffer functions loaded successfully!");
-    NEXUS_INFO("Using core OpenGL glDrawElements function");
+    NEXUS_INFO("OpenGL functions loaded! Gizmo will appear in top-right corner!");
 
     // Create VAO, VBO, and EBO
     unsigned int VAO, VBO, EBO;
@@ -166,12 +177,18 @@ int main()
     glVertexAttribPointer(2, 2, 0x1406, 0, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
-    NEXUS_INFO("3D Cube data created! Camera controls ready!");
+    NEXUS_INFO("Scene ready! Cube centered, gizmo in top-right corner!");
 
     // Enable depth testing
     glEnable(0x0B71); // GL_DEPTH_TEST
 
+    // Scene state
     float cubeRotation = 0.0f;
+    bool showGizmo = true;
+    Nexus::Vector3 cubePosition = Nexus::Vector3::Zero;
+
+    // Set gizmo to screen-space mode by default
+    gizmo->SetScreenSpace(true);
 
     // Main loop
     while (!window->ShouldClose())
@@ -179,9 +196,10 @@ int main()
         window->Update();
 
         // Camera controls
-        const float moveSpeed = 2.0f * (1.0f / 60.0f); // Assume 60 FPS for now
-        const float rotateSpeed = 1.0f * (1.0f / 60.0f);
+        const float moveSpeed = 3.0f * (1.0f / 60.0f);
+        const float rotateSpeed = 1.5f * (1.0f / 60.0f);
 
+        // Movement controls
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::W))
             camera->MoveForward(moveSpeed);
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::S))
@@ -195,7 +213,7 @@ int main()
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::E))
             camera->MoveUp(-moveSpeed);
 
-        // Mouse look (basic version)
+        // Camera rotation controls
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Left))
             camera->RotateYaw(-rotateSpeed);
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Right))
@@ -205,42 +223,64 @@ int main()
         if (Nexus::InputManager::IsKeyDown(Nexus::KeyCode::Down))
             camera->RotatePitch(-rotateSpeed);
 
+        // Gizmo controls
+        if (Nexus::InputManager::IsKeyPressed(Nexus::KeyCode::G))
+        {
+            showGizmo = !showGizmo;
+            NEXUS_INFO("Gizmo " + std::string(showGizmo ? "enabled" : "disabled"));
+        }
+
+        // Toggle between screen-space and world-space gizmo
+        if (Nexus::InputManager::IsKeyPressed(Nexus::KeyCode::Space))
+        {
+            gizmo->SetScreenSpace(!gizmo->IsScreenSpace());
+        }
+
         // Exit
         if (Nexus::InputManager::IsKeyPressed(Nexus::KeyCode::Escape))
             break;
 
         // Clear screen
-        glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
+        glClearColor(0.15f, 0.15f, 0.2f, 1.0f);
         glClear(0x00004100); // GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT
 
-        // Rotate cube
-        cubeRotation += 0.5f * (1.0f / 60.0f);
+        // Animate cube rotation
+        cubeRotation += 0.8f * (1.0f / 60.0f);
 
-        // Create model matrix (rotation)
-        Nexus::Matrix4 model = Nexus::Matrix4::RotateY(cubeRotation) * Nexus::Matrix4::RotateX(cubeRotation * 0.5f);
+        // Create model matrix for cube
+        Nexus::Matrix4 model = Nexus::Matrix4::Translate(cubePosition) *
+            Nexus::Matrix4::RotateY(cubeRotation) *
+            Nexus::Matrix4::RotateX(cubeRotation * 0.3f);
 
-        // Create MVP matrix
+        // Create MVP matrix for cube
         Nexus::Matrix4 mvp = camera->GetViewProjectionMatrix() * model;
 
-        // Render cube
+        // Render the textured cube
         shader->Bind();
         shader->SetMatrix4("u_MVP", mvp);
         shader->SetInt("u_Texture", 0);
 
         texture->Bind(0);
         glBindVertexArray(VAO);
-        ::glDrawElements(0x0004, 36, 0x1405, nullptr); // Use core OpenGL function - GL_TRIANGLES, GL_UNSIGNED_INT
+        ::glDrawElements(0x0004, 36, 0x1405, nullptr); // GL_TRIANGLES, GL_UNSIGNED_INT
+
+        // Render the gizmo
+        if (showGizmo)
+        {
+            gizmo->Render(camera->GetViewProjectionMatrix(), cubePosition);
+        }
 
         window->SwapBuffers();
     }
 
     // Cleanup
+    delete gizmo;
     delete camera;
     delete texture;
     delete shader;
     Nexus::InputManager::Shutdown();
     delete window;
-    NEXUS_CORE_INFO("3D Cube demo completed!");
+    NEXUS_CORE_INFO("3D Scene with Screen-Space Gizmo completed!");
 
     return 0;
 }
