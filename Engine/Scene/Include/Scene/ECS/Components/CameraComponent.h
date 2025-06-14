@@ -4,7 +4,7 @@
 namespace Nexus
 {
     // Camera component wrapping existing camera functionality
-    class Camera
+    class CameraComponent
     {
     public:
         // Camera properties
@@ -30,8 +30,8 @@ namespace Nexus
         bool isActive = true;       // Is camera currently active?
 
         // Constructors
-        Camera() = default;
-        Camera(float fieldOfView, float aspect, float near, float far)
+        CameraComponent() = default;
+        CameraComponent(float fieldOfView, float aspect, float near, float far)
             : fov(fieldOfView), aspectRatio(aspect), nearPlane(near), farPlane(far) {
         }
 
@@ -73,11 +73,11 @@ namespace Nexus
         {
             if (projectionType == ProjectionType::Perspective)
             {
-                return "Camera(Perspective, FOV: " + std::to_string(fov) + "°)";
+                return "CameraComponent(Perspective, FOV: " + std::to_string(fov) + "°)";
             }
             else
             {
-                return "Camera(Orthographic, Size: " + std::to_string(orthoSize) + ")";
+                return "CameraComponent(Orthographic, Size: " + std::to_string(orthoSize) + ")";
             }
         }
     };

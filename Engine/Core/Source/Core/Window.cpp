@@ -5,6 +5,7 @@
 #include <GL/gl.h>
 #include <vector>
 #include <string>
+#include <cmath>
 
 // Additional OpenGL constants
 #define GL_SHADING_LANGUAGE_VERSION       0x8B8C
@@ -24,17 +25,17 @@ namespace Nexus
     {
         // Remove common prefixes and clean up the name
         std::string cleaned = deviceString;
-        
+
         // Remove manufacturer prefixes
         size_t pos = cleaned.find("Intel(R) ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 9);
-        
+
         pos = cleaned.find("NVIDIA ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 7);
-        
+
         pos = cleaned.find("AMD ");
         if (pos != std::string::npos) cleaned = cleaned.substr(pos + 4);
-        
+
         return cleaned;
     }
 
@@ -42,20 +43,20 @@ namespace Nexus
     void DetectAllGraphicsAdapters()
     {
         NEXUS_CORE_INFO("=== System Graphics Hardware ===");
-        
+
         DISPLAY_DEVICEA displayDevice;
         displayDevice.cb = sizeof(displayDevice);
-        
+
         std::vector<std::string> activeGPUs;
         std::vector<std::string> inactiveGPUs;
-        
+
         for (DWORD deviceIndex = 0; ; deviceIndex++)
         {
             if (!EnumDisplayDevicesA(NULL, deviceIndex, &displayDevice, 0))
                 break;
-                
+
             std::string gpuName = ExtractGPUName(std::string(displayDevice.DeviceString));
-            
+
             if (displayDevice.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)
             {
                 if (displayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
@@ -85,14 +86,14 @@ namespace Nexus
                 }
             }
         }
-        
+
         // Display results with simple ASCII
         NEXUS_CORE_INFO("Active Graphics:");
         for (const auto& gpu : activeGPUs)
         {
             NEXUS_CORE_INFO("  [ACTIVE] " + gpu);
         }
-        
+
         if (!inactiveGPUs.empty())
         {
             NEXUS_CORE_INFO("Available Graphics:");
@@ -101,7 +102,7 @@ namespace Nexus
                 NEXUS_CORE_INFO("  [AVAIL]  " + gpu);
             }
         }
-        
+
         NEXUS_CORE_INFO("Total GPUs Found: " + std::to_string(activeGPUs.size() + inactiveGPUs.size()));
     }
 
@@ -144,10 +145,10 @@ namespace Nexus
             s_GLFWInitialized = true;
         }
 
-        // Set OpenGL version to 3.3 Core
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        // Set OpenGL version to 2.1 for compatibility
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        // Use default compatibility profile (no profile hint needed)
 
         m_Window = glfwCreateWindow((int)props.Width, (int)props.Height,
             m_Data.Title.c_str(), nullptr, nullptr);
@@ -172,38 +173,46 @@ namespace Nexus
 
         glfwMakeContextCurrent(m_Window);
 
+        // No GLAD initialization needed for compatibility mode
+        NEXUS_CORE_INFO("OpenGL compatibility mode - no function loading required");
+
         // Setup input callbacks
         glfwSetWindowUserPointer(m_Window, this);
         glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
-        {
-            InputManager::KeyCallback(window, key, scancode, action, mods);
-        });
+            {
+                InputManager::KeyCallback(window, key, scancode, action, mods);
+            });
         glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
-        {
-            InputManager::MouseButtonCallback(window, button, action, mods);
-        });
+            {
+                InputManager::MouseButtonCallback(window, button, action, mods);
+            });
         glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xpos, double ypos)
-        {
-            InputManager::MousePositionCallback(window, xpos, ypos);
-        });
+            {
+                InputManager::MousePositionCallback(window, xpos, ypos);
+            });
         glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xoffset, double yoffset)
-        {
-            InputManager::MouseScrollCallback(window, xoffset, yoffset);
-        });
+            {
+                InputManager::MouseScrollCallback(window, xoffset, yoffset);
+            });
 
         // Clean OpenGL info
         NEXUS_CORE_INFO("=== Active OpenGL Context ===");
         std::string vendor = (char*)glGetString(GL_VENDOR);
         std::string renderer = (char*)glGetString(GL_RENDERER);
         std::string version = (char*)glGetString(GL_VERSION);
-        
+
         NEXUS_CORE_INFO("Currently Using: " + ExtractGPUName(renderer));
         NEXUS_CORE_INFO("OpenGL Version: " + version);
-        
+
+        // Check if we have GLSL support (OpenGL 2.0+)
         const char* glslVersion = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
         if (glslVersion)
         {
             NEXUS_CORE_INFO("GLSL Version: " + std::string(glslVersion));
+        }
+        else
+        {
+            NEXUS_CORE_INFO("GLSL: Not available (using fixed-function pipeline)");
         }
 
         GLint maxTextureSize;
@@ -220,6 +229,9 @@ namespace Nexus
         {
             NEXUS_CORE_INFO("EXCELLENT: Using discrete NVIDIA graphics for optimal performance");
         }
+
+        // Set clear color to dark blue
+        glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
 
         glfwSwapInterval(1);
         NEXUS_CORE_INFO("Window Resolution: " + std::to_string(props.Width) + "x" + std::to_string(props.Height) + " @ 60Hz V-Sync");

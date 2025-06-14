@@ -25,6 +25,30 @@ IncludeDir = {}
 IncludeDir["GLFW"] = "ThirdParty/GLFW/include"
 IncludeDir["GLM"] = "ThirdParty/GLM"
 
+-- Build GLAD as a static library
+project "GLAD"
+    location "ThirdParty/GLAD"
+    kind "StaticLib"
+    language "C"
+    staticruntime "off"
+
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{prj.location}/Include/Glad.h",
+        "%{prj.location}/Source/Glad.cpp"
+    }
+
+    includedirs
+    {
+        "%{prj.location}/Include"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+
 -- Build GLFW as a static library
 project "GLFW"
     location "ThirdParty/GLFW"
@@ -212,12 +236,15 @@ project "Scene"
         "%{prj.location}/Include",
         "Engine/Math/Include",
         "Engine/Core/Include",
+        "Engine/Renderer/Include",
+        "ThirdParty/GLAD/Include",
         "%{IncludeDir.GLM}"
     }
 
     links
     {
-        "Math"
+        "Math",
+        "GLAD"
     }
 
     filter "system:windows"
