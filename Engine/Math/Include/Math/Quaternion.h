@@ -24,6 +24,9 @@ namespace Nexus
         Quaternion operator*(float scalar) const { return Quaternion(x * scalar, y * scalar, z * scalar, w * scalar); }
         Quaternion operator/(float scalar) const { return Quaternion(x / scalar, y / scalar, z / scalar, w / scalar); }
 
+        // Vector rotation
+        Vector3 operator*(const Vector3& vector) const;
+
         // Assignment operations
         Quaternion& operator+=(const Quaternion& other) { x += other.x; y += other.y; z += other.z; w += other.w; return *this; }
         Quaternion& operator-=(const Quaternion& other) { x -= other.x; y -= other.y; z -= other.z; w -= other.w; return *this; }
@@ -33,7 +36,6 @@ namespace Nexus
 
         // Math functions
         float Length() const { return std::sqrt(x * x + y * y + z * z + w * w); }
-
         Quaternion Normalized() const
         {
             float len = Length();
@@ -42,6 +44,7 @@ namespace Nexus
 
         // Conversion functions
         Vector3 ToEulerAngles() const;
+        Matrix4 ToMatrix() const;
 
         // Utility
         std::string ToString() const

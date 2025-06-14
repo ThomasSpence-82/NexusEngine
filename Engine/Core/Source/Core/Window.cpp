@@ -149,14 +149,26 @@ namespace Nexus
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, 
-                                   m_Data.Title.c_str(), nullptr, nullptr);
-        
+        m_Window = glfwCreateWindow((int)props.Width, (int)props.Height,
+            m_Data.Title.c_str(), nullptr, nullptr);
+
         if (!m_Window)
         {
             NEXUS_CORE_ERROR("Failed to create GLFW window!");
             return false;
         }
+
+        // Center the window on the primary monitor
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+        int windowWidth = static_cast<int>(props.Width);
+        int windowHeight = static_cast<int>(props.Height);
+
+        int xPos = (mode->width - windowWidth) / 2;
+        int yPos = (mode->height - windowHeight) / 2;
+
+        glfwSetWindowPos(m_Window, xPos, yPos);
 
         glfwMakeContextCurrent(m_Window);
 

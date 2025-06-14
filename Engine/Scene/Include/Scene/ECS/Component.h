@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <stdexcept>  // Added this include
 
 namespace Nexus
 {
@@ -136,4 +137,3 @@ namespace Nexus
         std::unordered_map<EntityID, size_t> m_EntityToIndex; // Map entity to component index
     };
 }
-

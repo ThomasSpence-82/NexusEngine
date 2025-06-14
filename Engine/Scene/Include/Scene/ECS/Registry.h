@@ -6,6 +6,8 @@
 #include <queue>
 #include <memory>
 #include <vector>
+#include <stdexcept>
+#include <functional>  // Added for std::ref
 
 namespace Nexus
 {
@@ -180,7 +182,8 @@ namespace Nexus
                 {
                     EntityID entityID = m_Storage->GetEntities()[m_Index];
                     Entity entity(entityID, m_Registry);
-                    return { entity, m_Storage->GetComponents()[m_Index] };
+                    T& component = const_cast<T&>(m_Storage->GetComponents()[m_Index]);
+                    return std::pair<Entity, T&>(entity, component);
                 }
 
                 Iterator& operator++() { ++m_Index; return *this; }

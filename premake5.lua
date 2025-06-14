@@ -1,5 +1,6 @@
 -- NexusEngine Root Build Configuration
 -- Session 003 - Added Math, Input, and Renderer modules
+-- Session 004 - Added Scene/ECS module
 
 workspace "NexusEngine"
     architecture "x64"
@@ -189,6 +190,48 @@ project "Renderer"
         defines "NEXUS_RELEASE"
         optimize "on"
 
+-- Scene System (ECS)
+project "Scene"
+    location "Engine/Scene"
+    kind "StaticLib"
+    language "C++"
+    cppdialect "C++20"
+    staticruntime "off"
+
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{prj.location}/Include/**.h",
+        "%{prj.location}/Source/**.cpp"
+    }
+
+    includedirs
+    {
+        "%{prj.location}/Include",
+        "Engine/Math/Include",
+        "Engine/Core/Include",
+        "%{IncludeDir.GLM}"
+    }
+
+    links
+    {
+        "Math"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+        defines "NEXUS_PLATFORM_WINDOWS"
+
+    filter "configurations:Debug"
+        defines "NEXUS_DEBUG"
+        symbols "on"
+
+    filter "configurations:Release"
+        defines "NEXUS_RELEASE"
+        optimize "on"
+
 -- Engine Core
 project "Core"
     location "Engine/Core"
@@ -218,6 +261,7 @@ project "Core"
         "Engine/Math/Include",
         "Engine/Input/Include",
         "Engine/Renderer/Include",
+        "Engine/Scene/Include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLM}"
     }
@@ -227,6 +271,7 @@ project "Core"
         "Math",
         "Input",
         "Renderer",
+        "Scene",
         "GLFW",
         "opengl32.lib"
     }
@@ -267,6 +312,7 @@ project "Runtime"
         "Engine/Math/Include",
         "Engine/Input/Include",
         "Engine/Renderer/Include",
+        "Engine/Scene/Include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLM}"
     }
@@ -276,7 +322,8 @@ project "Runtime"
         "Core",
         "Math",
         "Input",
-        "Renderer"
+        "Renderer",
+        "Scene"
     }
 
     filter "system:windows"
